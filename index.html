@@ -981,25 +981,84 @@ let cart        = [];
 ══════════════════════════════════ */
 async function init() {
   loadCfg();
-  if(cfg.sheet) await loadFromSheet();
-  else { allProducts=DEMO; renderAll(); }
+  // Mostra demo imediatamente para não ficar tela em branco
+  allProducts = DEMO;
+  renderAll();
+  // Tenta carregar da planilha em paralelo
+  if(cfg.sheet) loadFromSheet();
 }
 
 async function loadFromSheet() {
-  const url=`https://docs.google.com/spreadsheets/d/${cfg.sheet}/export?format=csv&gid=0`;
+  const grid = document.getElementById('productsGrid');
+  const banner = document.createElement('div');
+  banner.id = 'sheetBanner';
+  banner.style.cssText = 'grid-column:1/-1;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:10px 16px;font-size:.82rem;color:#92400E;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;';
+  banner.innerHTML = '⏳ Carregando produtos da planilha...';
+  grid.prepend(banner);
+
+  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheet}/export?format=csv&gid=0`;
   try {
-    const r=await fetch(url); if(!r.ok) throw 0;
-    const csv=await r.text();
-    allProducts=csv.trim().split('\n').slice(1).map((row,i)=>{
-      const c=row.split(',').map(v=>v.replace(/^"|"$/g,'').trim());
-      const ativo=(c[4]||'sim').toLowerCase();
-      if(ativo==='nao'||ativo==='não'||ativo==='false'||ativo==='0') return null;
-      const cat=c[3]||'Outros';
-      return {id:i+1,nome:c[0]||'',preco:parseFloat((c[1]||'0').replace(',','.')),
-               cat,emoji:catEmoji(cat),uni:'unidade',foto:c[6]||''};
-    }).filter(Boolean).filter(p=>p.nome);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const csv = await r.text();
+
+    // Verifica se veio HTML (planilha privada retorna página de login)
+    if (csv.trim().startsWith('<!')) {
+      throw new Error('PRIVADA');
+    }
+
+    const rows = csv.trim().split('\n').slice(1);
+    if (rows.length === 0) throw new Error('VAZIA');
+
+    const parsed = rows.map((row, i) => {
+      // Parser robusto que lida com vírgulas dentro de aspas
+      const c = parseCSVRow(row);
+      const ativo = (c[4] || 'sim').toLowerCase();
+      if (ativo === 'nao' || ativo === 'não' || ativo === 'false' || ativo === '0') return null;
+      const cat = c[3] || 'Outros';
+      const preco = parseFloat((c[1] || '0').replace(/[^0-9,]/g,'').replace(',','.')) || 0;
+      return { id: i+1, nome: (c[0]||'').trim(), preco, cat, emoji: catEmoji(cat), uni: 'unidade', foto: (c[6]||'').trim() };
+    }).filter(Boolean).filter(p => p.nome && p.preco > 0);
+
+    if (parsed.length === 0) throw new Error('VAZIA');
+
+    allProducts = parsed;
     renderAll();
-  } catch(e) { allProducts=DEMO; renderAll(); }
+    const b = document.getElementById('sheetBanner');
+    if(b) { b.style.background='#D1FAE5'; b.style.borderColor='#6EE7B7'; b.style.color='#065F46'; b.innerHTML=`✅ ${parsed.length} produtos carregados da planilha`; setTimeout(()=>b.remove(),3000); }
+
+  } catch(e) {
+    const b = document.getElementById('sheetBanner');
+    if(!b) return;
+    if (e.message === 'PRIVADA') {
+      b.style.background='#FEE2E2'; b.style.borderColor='#FCA5A5'; b.style.color='#991B1B';
+      b.innerHTML='🔒 Planilha privada! Vá em <b>Compartilhar → Qualquer pessoa com o link → Visualizador</b> e recarregue.';
+    } else if (e.message === 'VAZIA') {
+      b.style.background='#FEF3C7'; b.style.borderColor='#FCD34D'; b.style.color='#92400E';
+      b.innerHTML='⚠️ Planilha vazia. Execute o script para preencher os produtos.';
+    } else {
+      b.style.background='#FEE2E2'; b.style.borderColor='#FCA5A5'; b.style.color='#991B1B';
+      b.innerHTML='❌ Erro ao carregar planilha. Exibindo produtos de demonstração. Verifique se a planilha está pública.';
+    }
+    // mantém os produtos demo já carregados
+  }
+}
+
+function parseCSVRow(row) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += ch; }
+  }
+  result.push(cur.trim());
+  return result;
 }
 
 /* ══════════════════════════════════
