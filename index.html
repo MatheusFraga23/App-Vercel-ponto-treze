@@ -576,6 +576,91 @@ body {
   .products-grid { grid-template-columns:repeat(2,1fr); gap:10px; }
   .cart-drawer { width:100%; }
 }
+
+/* ══════════════════════════════════════════
+   CHECKOUT FORM
+══════════════════════════════════════════ */
+.checkout-form {{ display:flex; flex-direction:column; gap:12px; margin-bottom:14px; }}
+.cf-row {{ display:flex; gap:10px; }}
+.cf-group {{ display:flex; flex-direction:column; gap:4px; flex:1; }}
+.cf-label {{ font-size:.7rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }}
+.cf-input {{
+  width:100%; background:var(--bg);
+  border:1.5px solid var(--border); border-radius:var(--r);
+  padding:9px 12px; font-size:.85rem; font-family:inherit;
+  color:var(--ink); outline:none; transition:border var(--t);
+}}
+.cf-input:focus {{ border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft); }}
+.cf-input::placeholder {{ color:#9CA3AF; }}
+.cf-input[readonly] {{ background:#F9FAFB; color:var(--muted); }}
+
+/* toggle entrega */
+.toggle-row {{ display:flex; gap:8px; }}
+.toggle-opt {{
+  flex:1; padding:9px; border-radius:var(--r);
+  background:var(--bg); border:1.5px solid var(--border);
+  font-size:.8rem; font-weight:600; font-family:inherit;
+  color:var(--muted); cursor:pointer; transition:all var(--t);
+  text-align:center;
+}}
+.toggle-opt.active {{
+  background:var(--brand-soft); border-color:var(--brand-mid);
+  color:var(--brand);
+}}
+.toggle-opt:hover:not(.active) {{ border-color:var(--border2); color:var(--ink); }}
+
+/* pagamento */
+.pay-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }}
+.pay-opt {{
+  padding:9px 6px; border-radius:var(--r);
+  background:var(--bg); border:1.5px solid var(--border);
+  font-size:.78rem; font-weight:600; font-family:inherit;
+  color:var(--muted); cursor:pointer; transition:all var(--t);
+  text-align:center;
+}}
+.pay-opt.active {{
+  background:var(--brand-soft); border-color:var(--brand-mid);
+  color:var(--brand);
+}}
+.pay-opt:hover:not(.active) {{ border-color:var(--border2); color:var(--ink); }}
+
+/* cep */
+.cep-row {{ display:flex; gap:8px; }}
+.cep-row .cf-input {{ flex:1; }}
+.cep-btn {{
+  padding:9px 14px; background:var(--brand); border:none;
+  border-radius:var(--r); color:white; font-size:.8rem;
+  font-weight:700; cursor:pointer; font-family:inherit;
+  transition:background var(--t); white-space:nowrap;
+  flex-shrink:0;
+}}
+.cep-btn:hover {{ background:var(--brand-deep); }}
+.cep-status {{ font-size:.75rem; margin-top:4px; min-height:18px; }}
+.cep-ok {{ color:var(--green); font-weight:600; }}
+.cep-err {{ color:#EF4444; font-weight:600; }}
+.cep-loading {{ color:var(--muted); }}
+
+/* PIX */
+.pix-box {{
+  background:linear-gradient(135deg,#F0FDF4,#DCFCE7);
+  border:1.5px solid #86EFAC; border-radius:var(--r);
+  padding:12px 14px;
+}}
+.pix-label {{ font-size:.68rem; font-weight:700; color:#15803D; text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; }}
+.pix-key {{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:1rem; font-weight:800; color:#166534;
+  cursor:pointer; display:flex; align-items:center; gap:8px;
+  user-select:all;
+}}
+.pix-copy {{ font-size:.72rem; font-weight:600; color:#16A34A; background:rgba(22,163,74,.1); padding:2px 8px; border-radius:20px; }}
+.pix-hint {{ font-size:.7rem; color:#15803D; margin-top:6px; opacity:.8; }}
+
+/* drawer footer scroll */
+.drawer-foot {{
+  padding:16px 20px; border-top:1px solid var(--border);
+  background:var(--bg); overflow-y:auto; max-height:75vh;
+}}
 </style>
 </head>
 <body>
@@ -672,14 +757,109 @@ body {
   </div>
   <div class="drawer-body" id="drawerBody"></div>
   <div class="drawer-foot">
+
+    <!-- TOTAL -->
     <div class="total-line">
-      <span class="total-lbl">Total estimado</span>
+      <span class="total-lbl">Total do pedido</span>
       <span class="total-val" id="drawerTotal">R$ 0,00</span>
     </div>
-    <textarea class="obs-field" id="obsInput" placeholder="📍 Endereço, horário preferido, observações..."></textarea>
+
+    <!-- CHECKOUT FORM -->
+    <div class="checkout-form">
+
+      <!-- Nome + WPP -->
+      <div class="cf-row">
+        <div class="cf-group">
+          <label class="cf-label">👤 Seu nome</label>
+          <input class="cf-input" id="cfNome" type="text" placeholder="Nome completo">
+        </div>
+        <div class="cf-group">
+          <label class="cf-label">📱 Seu WhatsApp</label>
+          <input class="cf-input" id="cfWpp" type="tel" placeholder="(85) 99999-9999">
+        </div>
+      </div>
+
+      <!-- Entrega ou Retirada -->
+      <div class="cf-group">
+        <label class="cf-label">🚚 Como prefere receber?</label>
+        <div class="toggle-row">
+          <button class="toggle-opt active" id="btnDelivery" onclick="setEntrega('delivery')">🛵 Delivery</button>
+          <button class="toggle-opt" id="btnRetirada" onclick="setEntrega('retirada')">🏪 Retirar na loja</button>
+        </div>
+      </div>
+
+      <!-- Bloco endereço (delivery) -->
+      <div id="blocoEndereco">
+        <div class="cf-group">
+          <label class="cf-label">📮 CEP</label>
+          <div class="cep-row">
+            <input class="cf-input" id="cfCep" type="text" placeholder="00000-000" maxlength="9" oninput="maskCep(this)" onblur="buscaCep()">
+            <button class="cep-btn" onclick="buscaCep()">Buscar</button>
+          </div>
+          <div id="cepStatus" class="cep-status"></div>
+        </div>
+        <div class="cf-row" id="camposEnd" style="display:none">
+          <div class="cf-group" style="flex:2">
+            <label class="cf-label">🏠 Rua / Logradouro</label>
+            <input class="cf-input" id="cfRua" type="text" placeholder="Rua, Avenida...">
+          </div>
+          <div class="cf-group" style="flex:1">
+            <label class="cf-label">Nº</label>
+            <input class="cf-input" id="cfNum" type="text" placeholder="123">
+          </div>
+        </div>
+        <div class="cf-row" id="camposEnd2" style="display:none">
+          <div class="cf-group">
+            <label class="cf-label">Complemento</label>
+            <input class="cf-input" id="cfComp" type="text" placeholder="Apto, Bloco...">
+          </div>
+          <div class="cf-group">
+            <label class="cf-label">Bairro</label>
+            <input class="cf-input" id="cfBairro" type="text" placeholder="Bairro">
+          </div>
+        </div>
+        <div class="cf-group" id="camposEnd3" style="display:none">
+          <label class="cf-label">Cidade / Estado</label>
+          <input class="cf-input" id="cfCidade" type="text" placeholder="Cidade - UF" readonly>
+        </div>
+      </div>
+
+      <!-- Pagamento -->
+      <div class="cf-group">
+        <label class="cf-label">💳 Forma de pagamento</label>
+        <div class="pay-grid">
+          <button class="pay-opt active" id="pay-dinheiro" onclick="setPag('dinheiro')">💵 Dinheiro</button>
+          <button class="pay-opt" id="pay-pix" onclick="setPag('pix')">📲 PIX</button>
+          <button class="pay-opt" id="pay-debito" onclick="setPag('debito')">💳 Débito</button>
+          <button class="pay-opt" id="pay-credito" onclick="setPag('credito')">💳 Crédito</button>
+        </div>
+      </div>
+
+      <!-- PIX info -->
+      <div id="pixInfo" style="display:none" class="pix-box">
+        <div class="pix-label">Chave PIX (Telefone)</div>
+        <div class="pix-key" onclick="copyPix()">85989014145 <span class="pix-copy">📋 copiar</span></div>
+        <div class="pix-hint">Envie o comprovante no WhatsApp após o pedido</div>
+      </div>
+
+      <!-- Troco -->
+      <div id="trocoBox" style="display:none" class="cf-group">
+        <label class="cf-label">💵 Troco para quanto?</label>
+        <input class="cf-input" id="cfTroco" type="text" placeholder="Ex: R$ 50,00">
+      </div>
+
+      <!-- Obs -->
+      <div class="cf-group">
+        <label class="cf-label">📝 Observações</label>
+        <textarea class="obs-field" id="obsInput" placeholder="Ponto do frango, observações do pedido..."></textarea>
+      </div>
+
+    </div><!-- /checkout-form -->
+
     <button class="wpp-btn" onclick="sendWpp()">
-      📱 Enviar pedido pelo WhatsApp
+      📱 Confirmar pedido pelo WhatsApp
     </button>
+
   </div>
 </aside>
 
@@ -983,6 +1163,61 @@ function showToast(msg){
   el.textContent=msg; el.classList.add('on');
   clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),2600);
 }
+
+
+
+/* ══════════════════════════════════
+   CHECKOUT STATE
+══════════════════════════════════ */
+let tipoEntrega = 'delivery';
+let tipoPag     = 'dinheiro';
+
+function setEntrega(tipo) {{
+  tipoEntrega = tipo;
+  document.getElementById('btnDelivery').classList.toggle('active', tipo==='delivery');
+  document.getElementById('btnRetirada').classList.toggle('active', tipo==='retirada');
+  document.getElementById('blocoEndereco').style.display = tipo==='delivery' ? 'flex' : 'none';
+  document.getElementById('blocoEndereco').style.flexDirection = 'column';
+}}
+function setPag(tipo) {{
+  tipoPag = tipo;
+  ['dinheiro','pix','debito','credito'].forEach(p=>
+    document.getElementById('pay-'+p).classList.toggle('active', p===tipo));
+  document.getElementById('pixInfo').style.display  = tipo==='pix'      ? 'block' : 'none';
+  document.getElementById('trocoBox').style.display = tipo==='dinheiro' ? 'block' : 'none';
+}}
+
+function maskCep(el) {{
+  let v = el.value.replace(/\D/g,'');
+  if(v.length > 5) v = v.slice(0,5)+'-'+v.slice(5,8);
+  el.value = v;
+}}
+
+async function buscaCep() {{
+  const cep = document.getElementById('cfCep').value.replace(/\D/g,'');
+  const st  = document.getElementById('cepStatus');
+  if(cep.length !== 8) {{ st.innerHTML='<span class="cep-err">CEP inválido (8 dígitos)</span>'; return; }}
+  st.innerHTML='<span class="cep-loading">🔍 Buscando...</span>';
+  try {{
+    const r = await fetch(`https://viacep.com.br/ws/${{cep}}/json/`);
+    const d = await r.json();
+    if(d.erro) {{ st.innerHTML='<span class="cep-err">CEP não encontrado</span>'; return; }}
+    st.innerHTML=`<span class="cep-ok">✅ ${{d.localidade}} - ${{d.uf}}</span>`;
+    document.getElementById('cfRua').value    = d.logradouro || '';
+    document.getElementById('cfBairro').value = d.bairro     || '';
+    document.getElementById('cfCidade').value = `${{d.localidade}} - ${{d.uf}}`;
+    ['camposEnd','camposEnd2','camposEnd3'].forEach(id=>
+      document.getElementById(id).style.display='flex');
+    document.getElementById('camposEnd3').style.display='block';
+    document.getElementById('cfNum').focus();
+  }} catch(e) {{
+    st.innerHTML='<span class="cep-err">Erro ao buscar CEP. Tente novamente.</span>';
+  }}
+}}
+
+function copyPix() {{
+  navigator.clipboard.writeText('85989014145').then(()=>showToast('📋 Chave PIX copiada!'));
+}}
 
 init();
 </script>
